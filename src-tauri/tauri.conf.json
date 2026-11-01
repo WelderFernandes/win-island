@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "c-usersweldedevwin-island",
+  "productName": "win-island",
   "version": "0.1.0",
-  "identifier": "com.welde.c-usersweldedevwin-island",
+  "identifier": "com.welder.win-island",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,9 +12,17 @@
   "app": {
     "windows": [
       {
-        "title": "c-usersweldedevwin-island",
-        "width": 800,
-        "height": 600
+        "title": "win-island",
+        "label": "main",
+        "width": 600,
+        "height": 280,
+        "resizable": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {
