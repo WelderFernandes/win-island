@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    c_usersweldedevwin_island_lib::run()
+    win_island_lib::run();
 }
