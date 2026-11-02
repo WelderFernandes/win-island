@@ -129,6 +129,14 @@ fn skip_previous() -> Result<bool, String> {
     Ok(false)
 }
 
+#[tauri::command]
+fn set_ignore_cursor_events(app: tauri::AppHandle, ignore: bool) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_ignore_cursor_events(ignore);
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 fn setup_window_overlay(window: &tauri::WebviewWindow) {
     use windows::Win32::Foundation::HWND;
@@ -176,7 +184,8 @@ pub fn run() {
             get_media_info,
             toggle_play_pause,
             skip_next,
-            skip_previous
+            skip_previous,
+            set_ignore_cursor_events
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
