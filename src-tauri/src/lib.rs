@@ -227,7 +227,7 @@ fn setup_window_overlay(window: &tauri::WebviewWindow) {
             let win_width = 600;
             let win_height = 280;
             let pos_x = (screen_width - win_width) / 2;
-            let pos_y = 12;
+            let pos_y = 0; // Colado no topo exato da tela (sem espaçamento)
 
             let _ = SetWindowPos(
                 hwnd,

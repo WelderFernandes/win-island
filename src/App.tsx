@@ -18,8 +18,14 @@ interface SystemStatusInfo {
   has_battery: boolean;
 }
 
+// 3 Estágios da Ilha:
+// 1. "bubble": escondidinha no topo como uma bolha discreta
+// 2. "compact": ilha em si com informações ao passar o mouse
+// 3. "expanded": painel completo aberto ao clicar
+type IslandStage = "bubble" | "compact" | "expanded";
+
 export default function App() {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [stage, setStage] = useState<IslandStage>("bubble");
   const [mediaInfo, setMediaInfo] = useState<MediaSessionInfo>({
     title: "Nenhuma mídia",
     artist: "Windows Media",
@@ -33,7 +39,7 @@ export default function App() {
     has_battery: false,
   });
 
-  // Polling GSMTC system media and battery status
+  // Polling GSMTC system media e bateria
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -51,6 +57,29 @@ export default function App() {
     const interval = setInterval(fetchStatus, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleMouseEnter = () => {
+    if (stage === "bubble") {
+      setStage("compact");
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (stage === "compact") {
+      setStage("bubble");
+    }
+  };
+
+  const handlePillClick = () => {
+    if (stage === "bubble" || stage === "compact") {
+      setStage("expanded");
+    }
+  };
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setStage("bubble");
+  };
 
   const handleTogglePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -80,34 +109,48 @@ export default function App() {
     }
   };
 
-  // macOS elastic spring physics
+  // Física elástica de mola estilo macOS
   const springTransition: Transition = {
     type: "spring",
-    stiffness: 380,
-    damping: 26,
-    mass: 0.8,
+    stiffness: 420,
+    damping: 28,
+    mass: 0.75,
   };
 
   return (
     <div className="island-container">
       <motion.div
         className="island-pill"
-        onClick={() => {
-          if (!isExpanded) {
-            setIsExpanded(true);
-          }
-        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={handlePillClick}
         layout
         initial={false}
         animate={{
-          width: isExpanded ? 380 : 220,
-          height: isExpanded ? 165 : 38,
-          borderRadius: isExpanded ? 32 : 19,
+          width: stage === "bubble" ? 54 : stage === "compact" ? 230 : 380,
+          height: stage === "bubble" ? 14 : stage === "compact" ? 38 : 165,
+          borderBottomLeftRadius: stage === "bubble" ? 12 : stage === "compact" ? 20 : 32,
+          borderBottomRightRadius: stage === "bubble" ? 12 : stage === "compact" ? 20 : 32,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
         }}
         transition={springTransition}
       >
         <AnimatePresence mode="wait">
-          {!isExpanded ? (
+          {stage === "bubble" && (
+            <motion.div
+              key="bubble"
+              className="island-bubble"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <div className="bubble-glow" />
+            </motion.div>
+          )}
+
+          {stage === "compact" && (
             <motion.div
               key="compact"
               className="island-compact"
@@ -158,7 +201,9 @@ export default function App() {
                 ))}
               </div>
             </motion.div>
-          ) : (
+          )}
+
+          {stage === "expanded" && (
             <motion.div
               key="expanded"
               className="island-expanded"
@@ -219,7 +264,7 @@ export default function App() {
 
                 <button
                   className="ctrl-btn"
-                  onClick={() => setIsExpanded(false)}
+                  onClick={handleClose}
                   style={{ fontSize: 12, opacity: 0.6 }}
                 >
                   Fechar

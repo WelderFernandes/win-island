@@ -20,22 +20,40 @@ html, body, #root {
   align-items: flex-start;
   width: 100%;
   height: 100%;
-  padding-top: 8px;
+  padding-top: 0px; /* Colado no topo exato da tela */
 }
 
 .island-pill {
-  background: rgba(10, 10, 12, 0.88);
+  background: rgba(10, 10, 12, 0.92);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.2) inset;
-  border-radius: 28px;
+  border-top: none; /* Emenda perfeitamente com a moldura superior */
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.2) inset;
   overflow: hidden;
   display: flex;
   cursor: pointer;
+  transform-origin: top center;
 }
 
-/* Compact State */
+/* Estágio 1: Bolha Minimalista (Hidden / Idle) */
+.island-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.bubble-glow {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+/* Estágio 2: Compact Island (Hover) */
 .island-compact {
   display: flex;
   align-items: center;
@@ -51,7 +69,7 @@ html, body, #root {
   gap: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: #1ed760;
+  color: #ffffff;
 }
 
 .island-compact .right-visualizer {
@@ -63,10 +81,10 @@ html, body, #root {
 .bar {
   width: 3px;
   border-radius: 2px;
-  background-color: #1ed760;
+  background-color: #22c55e;
 }
 
-/* Expanded State */
+/* Estágio 3: Expanded Island (Click) */
 .island-expanded {
   display: flex;
   flex-direction: column;
@@ -86,7 +104,7 @@ html, body, #root {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -158,6 +176,6 @@ html, body, #root {
 .progress-bar {
   height: 100%;
   width: 45%;
-  background: #1ed760;
+  background: #22c55e;
   border-radius: 2px;
 }
