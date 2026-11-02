@@ -33,25 +33,6 @@ export default function App() {
     has_battery: false,
   });
 
-  // Dynamic click-through: when cursor enters the pill, enable mouse events;
-  // when cursor leaves the pill, ignore mouse events so the user can click through transparent areas.
-  const handleMouseEnter = () => {
-    invoke("set_ignore_cursor_events", { ignore: false }).catch(() => {});
-  };
-
-  const handleMouseLeave = () => {
-    if (!isExpanded) {
-      invoke("set_ignore_cursor_events", { ignore: true }).catch(() => {});
-    }
-  };
-
-  // Ensure window captures clicks when expanded
-  useEffect(() => {
-    if (isExpanded) {
-      invoke("set_ignore_cursor_events", { ignore: false }).catch(() => {});
-    }
-  }, [isExpanded]);
-
   // Polling GSMTC system media and battery status
   useEffect(() => {
     const fetchStatus = async () => {
@@ -111,9 +92,11 @@ export default function App() {
     <div className="island-container">
       <motion.div
         className="island-pill"
-        onClick={() => setIsExpanded(!isExpanded)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onClick={() => {
+          if (!isExpanded) {
+            setIsExpanded(true);
+          }
+        }}
         layout
         initial={false}
         animate={{
@@ -236,10 +219,7 @@ export default function App() {
 
                 <button
                   className="ctrl-btn"
-                  onClick={() => {
-                    setIsExpanded(false);
-                    invoke("set_ignore_cursor_events", { ignore: true }).catch(() => {});
-                  }}
+                  onClick={() => setIsExpanded(false)}
                   style={{ fontSize: 12, opacity: 0.6 }}
                 >
                   Fechar
