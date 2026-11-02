@@ -7,6 +7,36 @@ pub struct MediaSessionInfo {
     pub artist: String,
     pub is_playing: bool,
     pub has_media: bool,
+    pub thumbnail_base64: Option<String>,
+}
+
+#[cfg(windows)]
+fn extract_thumbnail_base64(props: &windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties) -> Option<String> {
+    use base64::Engine;
+    use windows::Storage::Streams::{Buffer, DataReader, InputStreamOptions};
+
+    if let Ok(thumb_ref) = props.Thumbnail() {
+        if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
+            if let Ok(stream) = stream_op.get() {
+                let size = stream.Size().unwrap_or(0);
+                if size > 0 && size < 10 * 1024 * 1024 {
+                    let buffer = Buffer::Create(size as u32).ok()?;
+                    if let Ok(read_op) = stream.ReadAsync(&buffer, size as u32, InputStreamOptions::None) {
+                        if let Ok(read_buffer) = read_op.get() {
+                            if let Ok(reader) = DataReader::FromBuffer(&read_buffer) {
+                                let mut bytes = vec![0u8; size as usize];
+                                if reader.ReadBytes(&mut bytes).is_ok() {
+                                    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                                    return Some(format!("data:image/jpeg;base64,{}", encoded));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(windows)]
@@ -33,12 +63,14 @@ fn get_media_info() -> Result<MediaSessionInfo, String> {
             if let Ok(props) = media_properties_op.get() {
                 let title = props.Title().map(|s| s.to_string()).unwrap_or_default();
                 let artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
+                let thumbnail_base64 = extract_thumbnail_base64(&props);
 
                 return Ok(MediaSessionInfo {
                     title: if title.is_empty() { "Desconhecido".to_string() } else { title },
                     artist: if artist.is_empty() { "Artista Desconhecido".to_string() } else { artist },
                     is_playing,
                     has_media: true,
+                    thumbnail_base64,
                 });
             }
         }
@@ -49,6 +81,7 @@ fn get_media_info() -> Result<MediaSessionInfo, String> {
         artist: "Windows Media".to_string(),
         is_playing: false,
         has_media: false,
+        thumbnail_base64: None,
     })
 }
 
@@ -60,6 +93,7 @@ fn get_media_info() -> Result<MediaSessionInfo, String> {
         artist: "Mock Artist".to_string(),
         is_playing: false,
         has_media: false,
+        thumbnail_base64: None,
     })
 }
 

@@ -5,10 +5,11 @@ import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 interface MediaSessionInfo {
-  title: String;
-  artist: String;
+  title: string;
+  artist: string;
   is_playing: boolean;
   has_media: boolean;
+  thumbnail_base64?: string | null;
 }
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
     artist: "Windows Media",
     is_playing: false,
     has_media: false,
+    thumbnail_base64: null,
   });
 
   // Dynamic click-through: when cursor enters the pill, enable mouse events;
@@ -118,8 +120,16 @@ export default function App() {
               transition={{ duration: 0.15 }}
             >
               <div className="left-icon">
-                <Music size={15} />
-                <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {mediaInfo.thumbnail_base64 ? (
+                  <img
+                    src={mediaInfo.thumbnail_base64}
+                    alt="Cover"
+                    style={{ width: 18, height: 18, borderRadius: 5, objectFit: "cover" }}
+                  />
+                ) : (
+                  <Music size={15} />
+                )}
+                <span style={{ maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {mediaInfo.has_media ? mediaInfo.title : "Dynamic Island"}
                 </span>
               </div>
@@ -156,8 +166,16 @@ export default function App() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="expanded-header">
-                <div className="album-cover">
-                  <Music size={24} color="#ffffff" />
+                <div className="album-cover" style={{ overflow: "hidden" }}>
+                  {mediaInfo.thumbnail_base64 ? (
+                    <img
+                      src={mediaInfo.thumbnail_base64}
+                      alt="Album Cover"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <Music size={24} color="#ffffff" />
+                  )}
                 </div>
                 <div className="track-details">
                   <span className="track-title">{mediaInfo.title}</span>
