@@ -18,83 +18,57 @@ pub struct SystemStatusInfo {
 }
 
 #[cfg(windows)]
-fn extract_thumbnail_base64(props: &windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties) -> Option<String> {
-    use base64::Engine;
-    use windows::Storage::Streams::{Buffer, DataReader, InputStreamOptions};
+#[tauri::command]
+async fn get_media_info() -> Result<MediaSessionInfo, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
 
-    if let Ok(thumb_ref) = props.Thumbnail() {
-        if let Ok(stream_op) = thumb_ref.OpenReadAsync() {
-            if let Ok(stream) = stream_op.get() {
-                let size = stream.Size().unwrap_or(0);
-                if size > 0 && size < 10 * 1024 * 1024 {
-                    let buffer = Buffer::Create(size as u32).ok()?;
-                    if let Ok(read_op) = stream.ReadAsync(&buffer, size as u32, InputStreamOptions::None) {
-                        if let Ok(read_buffer) = read_op.get() {
-                            if let Ok(reader) = DataReader::FromBuffer(&read_buffer) {
-                                let mut bytes = vec![0u8; size as usize];
-                                if reader.ReadBytes(&mut bytes).is_ok() {
-                                    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-                                    return Some(format!("data:image/jpeg;base64,{}", encoded));
-                                }
-                            }
+        if let Ok(op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+            if let Ok(session_manager) = op.get() {
+                if let Ok(current_session) = session_manager.GetCurrentSession() {
+                    let is_playing = if let Ok(playback_info) = current_session.GetPlaybackInfo() {
+                        if let Ok(status) = playback_info.PlaybackStatus() {
+                            status == windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                    if let Ok(media_properties_op) = current_session.TryGetMediaPropertiesAsync() {
+                        if let Ok(props) = media_properties_op.get() {
+                            let title = props.Title().map(|s| s.to_string()).unwrap_or_default();
+                            let artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
+
+                            return Ok(MediaSessionInfo {
+                                title: if title.is_empty() { "Desconhecido".to_string() } else { title },
+                                artist: if artist.is_empty() { "Artista Desconhecido".to_string() } else { artist },
+                                is_playing,
+                                has_media: true,
+                                thumbnail_base64: None,
+                            });
                         }
                     }
                 }
             }
         }
-    }
-    None
-}
 
-#[cfg(windows)]
-#[tauri::command]
-fn get_media_info() -> Result<MediaSessionInfo, String> {
-    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
-
-    let op = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .map_err(|e| e.to_string())?;
-    let session_manager = op.get().map_err(|e| e.to_string())?;
-
-    if let Ok(current_session) = session_manager.GetCurrentSession() {
-        let is_playing = if let Ok(playback_info) = current_session.GetPlaybackInfo() {
-            if let Ok(status) = playback_info.PlaybackStatus() {
-                status == windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        if let Ok(media_properties_op) = current_session.TryGetMediaPropertiesAsync() {
-            if let Ok(props) = media_properties_op.get() {
-                let title = props.Title().map(|s| s.to_string()).unwrap_or_default();
-                let artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
-                let thumbnail_base64 = extract_thumbnail_base64(&props);
-
-                return Ok(MediaSessionInfo {
-                    title: if title.is_empty() { "Desconhecido".to_string() } else { title },
-                    artist: if artist.is_empty() { "Artista Desconhecido".to_string() } else { artist },
-                    is_playing,
-                    has_media: true,
-                    thumbnail_base64,
-                });
-            }
-        }
-    }
-
-    Ok(MediaSessionInfo {
-        title: "Nenhuma mídia".to_string(),
-        artist: "Windows Media".to_string(),
-        is_playing: false,
-        has_media: false,
-        thumbnail_base64: None,
+        Ok(MediaSessionInfo {
+            title: "Nenhuma mídia".to_string(),
+            artist: "Windows Media".to_string(),
+            is_playing: false,
+            has_media: false,
+            thumbnail_base64: None,
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
-fn get_media_info() -> Result<MediaSessionInfo, String> {
+async fn get_media_info() -> Result<MediaSessionInfo, String> {
     Ok(MediaSessionInfo {
         title: "Mock Title".to_string(),
         artist: "Mock Artist".to_string(),
@@ -147,67 +121,79 @@ fn get_system_status() -> Result<SystemStatusInfo, String> {
 
 #[cfg(windows)]
 #[tauri::command]
-fn toggle_play_pause() -> Result<bool, String> {
-    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+async fn toggle_play_pause() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
 
-    let op = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .map_err(|e| e.to_string())?;
-    let session_manager = op.get().map_err(|e| e.to_string())?;
-
-    if let Ok(current_session) = session_manager.GetCurrentSession() {
-        let _ = current_session.TryTogglePlayPauseAsync();
-        return Ok(true);
-    }
-    Ok(false)
+        if let Ok(op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+            if let Ok(session_manager) = op.get() {
+                if let Ok(current_session) = session_manager.GetCurrentSession() {
+                    let _ = current_session.TryTogglePlayPauseAsync();
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
-fn toggle_play_pause() -> Result<bool, String> {
+async fn toggle_play_pause() -> Result<bool, String> {
     Ok(false)
 }
 
 #[cfg(windows)]
 #[tauri::command]
-fn skip_next() -> Result<bool, String> {
-    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+async fn skip_next() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
 
-    let op = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .map_err(|e| e.to_string())?;
-    let session_manager = op.get().map_err(|e| e.to_string())?;
-
-    if let Ok(current_session) = session_manager.GetCurrentSession() {
-        let _ = current_session.TrySkipNextAsync();
-        return Ok(true);
-    }
-    Ok(false)
+        if let Ok(op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+            if let Ok(session_manager) = op.get() {
+                if let Ok(current_session) = session_manager.GetCurrentSession() {
+                    let _ = current_session.TrySkipNextAsync();
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
-fn skip_next() -> Result<bool, String> {
+async fn skip_next() -> Result<bool, String> {
     Ok(false)
 }
 
 #[cfg(windows)]
 #[tauri::command]
-fn skip_previous() -> Result<bool, String> {
-    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+async fn skip_previous() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
 
-    let op = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .map_err(|e| e.to_string())?;
-    let session_manager = op.get().map_err(|e| e.to_string())?;
-
-    if let Ok(current_session) = session_manager.GetCurrentSession() {
-        let _ = current_session.TrySkipPreviousAsync();
-        return Ok(true);
-    }
-    Ok(false)
+        if let Ok(op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+            if let Ok(session_manager) = op.get() {
+                if let Ok(current_session) = session_manager.GetCurrentSession() {
+                    let _ = current_session.TrySkipPreviousAsync();
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(not(windows))]
 #[tauri::command]
-fn skip_previous() -> Result<bool, String> {
+async fn skip_previous() -> Result<bool, String> {
     Ok(false)
 }
 
@@ -230,7 +216,6 @@ fn setup_window_overlay(window: &tauri::WebviewWindow) {
     if let Ok(hwnd_ptr) = window.hwnd() {
         let hwnd = HWND(hwnd_ptr.0 as _);
         unsafe {
-            // Remove from Alt+Tab
             let ex_style = windows::Win32::UI::WindowsAndMessaging::GetWindowLongW(hwnd, GWL_EXSTYLE);
             windows::Win32::UI::WindowsAndMessaging::SetWindowLongW(
                 hwnd,
@@ -238,7 +223,6 @@ fn setup_window_overlay(window: &tauri::WebviewWindow) {
                 ex_style | WS_EX_TOOLWINDOW.0 as i32,
             );
 
-            // Center horizontally at the top of the monitor
             let screen_width = GetSystemMetrics(SM_CXSCREEN);
             let win_width = 600;
             let win_height = 280;
