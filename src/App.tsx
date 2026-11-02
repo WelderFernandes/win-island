@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, type Transition } from "framer-motion";
-import { Play, Pause, SkipForward, SkipBack, Music, Volume2 } from "lucide-react";
+import { Play, Pause, SkipForward, SkipBack, Music, Volume2, Battery, BatteryCharging } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
@@ -12,6 +12,12 @@ interface MediaSessionInfo {
   thumbnail_base64?: string | null;
 }
 
+interface SystemStatusInfo {
+  battery_percent: number;
+  is_charging: boolean;
+  has_battery: boolean;
+}
+
 export default function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [mediaInfo, setMediaInfo] = useState<MediaSessionInfo>({
@@ -20,6 +26,11 @@ export default function App() {
     is_playing: false,
     has_media: false,
     thumbnail_base64: null,
+  });
+  const [systemStatus, setSystemStatus] = useState<SystemStatusInfo>({
+    battery_percent: 100,
+    is_charging: true,
+    has_battery: false,
   });
 
   // Dynamic click-through: when cursor enters the pill, enable mouse events;
@@ -41,19 +52,22 @@ export default function App() {
     }
   }, [isExpanded]);
 
-  // Polling GSMTC system media state every second
+  // Polling GSMTC system media and battery status
   useEffect(() => {
-    const fetchMedia = async () => {
+    const fetchStatus = async () => {
       try {
-        const info = await invoke<MediaSessionInfo>("get_media_info");
-        setMediaInfo(info);
+        const media = await invoke<MediaSessionInfo>("get_media_info");
+        setMediaInfo(media);
+
+        const sys = await invoke<SystemStatusInfo>("get_system_status");
+        setSystemStatus(sys);
       } catch (err) {
-        console.error("Erro ao obter mídia do Windows:", err);
+        console.error("Erro ao obter status do Windows:", err);
       }
     };
 
-    fetchMedia();
-    const interval = setInterval(fetchMedia, 1000);
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -103,8 +117,8 @@ export default function App() {
         layout
         initial={false}
         animate={{
-          width: isExpanded ? 380 : 210,
-          height: isExpanded ? 160 : 38,
+          width: isExpanded ? 380 : 220,
+          height: isExpanded ? 165 : 38,
           borderRadius: isExpanded ? 32 : 19,
         }}
         transition={springTransition}
@@ -134,6 +148,12 @@ export default function App() {
                 </span>
               </div>
               <div className="right-visualizer">
+                {systemStatus.has_battery && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 3, marginRight: 6, fontSize: 11, opacity: 0.8 }}>
+                    {systemStatus.is_charging ? <BatteryCharging size={13} color="#22c55e" /> : <Battery size={13} />}
+                    <span>{systemStatus.battery_percent}%</span>
+                  </div>
+                )}
                 {[0.4, 0.8, 0.5, 0.9, 0.3].map((height, i) => (
                   <motion.div
                     key={i}
@@ -181,6 +201,12 @@ export default function App() {
                   <span className="track-title">{mediaInfo.title}</span>
                   <span className="track-artist">{mediaInfo.artist}</span>
                 </div>
+                {systemStatus.has_battery && (
+                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontSize: 12, opacity: 0.8 }}>
+                    {systemStatus.is_charging ? <BatteryCharging size={15} color="#22c55e" /> : <Battery size={15} />}
+                    <span>{systemStatus.battery_percent}%</span>
+                  </div>
+                )}
               </div>
 
               <div className="progress-container">

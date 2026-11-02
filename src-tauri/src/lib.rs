@@ -10,6 +10,13 @@ pub struct MediaSessionInfo {
     pub thumbnail_base64: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SystemStatusInfo {
+    pub battery_percent: u8,
+    pub is_charging: bool,
+    pub has_battery: bool,
+}
+
 #[cfg(windows)]
 fn extract_thumbnail_base64(props: &windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties) -> Option<String> {
     use base64::Engine;
@@ -94,6 +101,47 @@ fn get_media_info() -> Result<MediaSessionInfo, String> {
         is_playing: false,
         has_media: false,
         thumbnail_base64: None,
+    })
+}
+
+#[cfg(windows)]
+#[tauri::command]
+fn get_system_status() -> Result<SystemStatusInfo, String> {
+    use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+
+    let mut status = SYSTEM_POWER_STATUS::default();
+    unsafe {
+        if GetSystemPowerStatus(&mut status).is_ok() {
+            let has_battery = status.BatteryFlag != 128 && status.BatteryLifePercent != 255;
+            let battery_percent = if status.BatteryLifePercent <= 100 {
+                status.BatteryLifePercent
+            } else {
+                100
+            };
+            let is_charging = status.ACLineStatus == 1;
+
+            return Ok(SystemStatusInfo {
+                battery_percent,
+                is_charging,
+                has_battery,
+            });
+        }
+    }
+
+    Ok(SystemStatusInfo {
+        battery_percent: 100,
+        is_charging: true,
+        has_battery: false,
+    })
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn get_system_status() -> Result<SystemStatusInfo, String> {
+    Ok(SystemStatusInfo {
+        battery_percent: 100,
+        is_charging: true,
+        has_battery: false,
     })
 }
 
@@ -216,6 +264,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_media_info,
+            get_system_status,
             toggle_play_pause,
             skip_next,
             skip_previous,
