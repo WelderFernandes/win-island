@@ -1,13 +1,70 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence, type Transition } from "framer-motion";
 import { Play, Pause, SkipForward, SkipBack, Music, Volume2 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+
+interface MediaSessionInfo {
+  title: String;
+  artist: String;
+  is_playing: boolean;
+  has_media: boolean;
+}
 
 export default function App() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [mediaInfo, setMediaInfo] = useState<MediaSessionInfo>({
+    title: "Nenhuma mídia",
+    artist: "Windows Media",
+    is_playing: false,
+    has_media: false,
+  });
 
-  // Elastic macOS spring physics configuration
+  // Polling GSMTC system media state every second
+  useEffect(() => {
+    const fetchMedia = async () => {
+      try {
+        const info = await invoke<MediaSessionInfo>("get_media_info");
+        setMediaInfo(info);
+      } catch (err) {
+        console.error("Erro ao obter mídia do Windows:", err);
+      }
+    };
+
+    fetchMedia();
+    const interval = setInterval(fetchMedia, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTogglePlay = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await invoke("toggle_play_pause");
+      setMediaInfo((prev) => ({ ...prev, is_playing: !prev.is_playing }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSkipNext = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await invoke("skip_next");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSkipPrev = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await invoke("skip_previous");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // macOS elastic spring physics
   const springTransition: Transition = {
     type: "spring",
     stiffness: 380,
@@ -23,7 +80,7 @@ export default function App() {
         layout
         initial={false}
         animate={{
-          width: isExpanded ? 380 : 200,
+          width: isExpanded ? 380 : 210,
           height: isExpanded ? 160 : 38,
           borderRadius: isExpanded ? 32 : 19,
         }}
@@ -41,7 +98,9 @@ export default function App() {
             >
               <div className="left-icon">
                 <Music size={15} />
-                <span>Now Playing</span>
+                <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {mediaInfo.has_media ? mediaInfo.title : "Dynamic Island"}
+                </span>
               </div>
               <div className="right-visualizer">
                 {[0.4, 0.8, 0.5, 0.9, 0.3].map((height, i) => (
@@ -49,7 +108,7 @@ export default function App() {
                     key={i}
                     className="bar"
                     animate={
-                      isPlaying
+                      mediaInfo.is_playing
                         ? {
                             height: [height * 14, 16, 4, height * 12],
                           }
@@ -80,8 +139,8 @@ export default function App() {
                   <Music size={24} color="#ffffff" />
                 </div>
                 <div className="track-details">
-                  <span className="track-title">Starboy</span>
-                  <span className="track-artist">The Weeknd, Daft Punk</span>
+                  <span className="track-title">{mediaInfo.title}</span>
+                  <span className="track-artist">{mediaInfo.artist}</span>
                 </div>
               </div>
 
@@ -93,19 +152,19 @@ export default function App() {
                 <Volume2 size={18} color="rgba(255, 255, 255, 0.6)" />
 
                 <div className="playback-buttons">
-                  <button className="ctrl-btn" aria-label="Anterior">
+                  <button className="ctrl-btn" onClick={handleSkipPrev} aria-label="Anterior">
                     <SkipBack size={18} />
                   </button>
 
                   <button
                     className="ctrl-btn"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    aria-label={isPlaying ? "Pausar" : "Reproduzir"}
+                    onClick={handleTogglePlay}
+                    aria-label={mediaInfo.is_playing ? "Pausar" : "Reproduzir"}
                   >
-                    {isPlaying ? <Pause size={22} fill="white" /> : <Play size={22} fill="white" />}
+                    {mediaInfo.is_playing ? <Pause size={22} fill="white" /> : <Play size={22} fill="white" />}
                   </button>
 
-                  <button className="ctrl-btn" aria-label="Próximo">
+                  <button className="ctrl-btn" onClick={handleSkipNext} aria-label="Próximo">
                     <SkipForward size={18} />
                   </button>
                 </div>
